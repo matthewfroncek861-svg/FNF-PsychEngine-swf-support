@@ -11,6 +11,7 @@ import openfl.display.MovieClip;
 import openfl.display.Loader;
 import openfl.utils.ByteArray;
 import openfl.events.Event;
+import openfl.display.FrameLabel;
 
 import haxe.Json;
 import sys.io.File;
@@ -88,6 +89,7 @@ class Character extends FlxSprite
 	// SWF / ZIP support
 	public var isSWF:Bool = false;
 	public var swfClip:MovieClip;
+	public var swfLabels:Map<String, FrameLabel> = new Map();
 	public var isZipped:Bool = false;
 	public var zipExtractPath:String = '';
 
@@ -155,7 +157,7 @@ class Character extends FlxSprite
 		isSWF = false;
 		isZipped = false;
 
-		// ZIP and SWF detection
+		// Detect formats
 		var zipPath:String = Paths.getPath('images/' + json.image + '.zip', BINARY);
 		var animZipPath:String = Paths.getPath('images/' + json.image + '.anim.zip', BINARY);
 		var swfPath:String = Paths.getPath('images/' + json.image + '.swf', BINARY);
@@ -219,6 +221,10 @@ class Character extends FlxSprite
 				swfClip = cast(loader.content, MovieClip);
 				addChild(swfClip);
 				swfClip.play();
+
+				// Map SWF frame labels for FNF animation control
+				for (label in swfClip.currentLabels)
+					swfLabels.set(label.name.toLowerCase(), label);
 			});
 			loader.loadBytes(bytes);
 		}
@@ -233,23 +239,17 @@ class Character extends FlxSprite
 		updateHitbox();
 
 		if(!isAnimateAtlas && !isSWF)
-		{
 			frames = Paths.getMultiAtlas(json.image.split(','));
-		}
+
 		#if flxanimate
 		else if(isAnimateAtlas)
 		{
 			atlas = new FlxAnimate();
 			atlas.showPivot = false;
 			try
-			{
 				Paths.loadAnimateAtlas(atlas, json.image);
-			}
 			catch(e:haxe.Exception)
-			{
-				FlxG.log.warn('Could not load atlas ${json.image}: $e');
-				trace(e.stack);
-			}
+				trace('Could not load atlas ${json.image}: $e');
 		}
 		#end
 
@@ -274,8 +274,10 @@ class Character extends FlxSprite
 		antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 
 		animationsArray = json.animations;
-		if(animationsArray != null && animationsArray.length > 0) {
-			for (anim in animationsArray) {
+		if(animationsArray != null && animationsArray.length > 0)
+		{
+			for (anim in animationsArray)
+			{
 				var animAnim:String = '' + anim.anim;
 				var animName:String = '' + anim.name;
 				var animFps:Int = anim.fps;
@@ -299,13 +301,31 @@ class Character extends FlxSprite
 				}
 				#end
 
-				if(anim.offsets != null && anim.offsets.length > 1) addOffset(anim.anim, anim.offsets[0], anim.offsets[1]);
-				else addOffset(anim.anim, 0, 0);
+				if(anim.offsets != null && anim.offsets.length > 1)
+					addOffset(anim.anim, anim.offsets[0], anim.offsets[1]);
+				else
+					addOffset(anim.anim, 0, 0);
 			}
 		}
 		#if flxanimate
 		if(isAnimateAtlas) copyAtlasValues();
 		#end
+	}
+
+	// SWF-aware playAnim
+	public override function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
+	{
+		if(isSWF && swfClip != null)
+		{
+			var label = swfLabels.get(AnimName.toLowerCase());
+			if(label != null)
+				swfClip.gotoAndPlay(label.frame);
+			else
+				swfClip.gotoAndPlay(1);
+			return;
+		}
+
+		super.playAnim(AnimName, Force, Reversed, Frame);
 	}
 
 	override function update(elapsed:Float)
@@ -320,7 +340,6 @@ class Character extends FlxSprite
 			return;
 		}
 		if(isAnimateAtlas) atlas.update(elapsed);
-
 		super.update(elapsed);
 	}
 
@@ -336,6 +355,7 @@ class Character extends FlxSprite
 		{
 			removeChild(swfClip);
 			swfClip = null;
+			swfLabels = new Map();
 		}
 
 		if(isZipped && FileSystem.exists(zipExtractPath))
