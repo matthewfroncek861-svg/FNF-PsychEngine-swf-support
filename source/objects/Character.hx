@@ -244,8 +244,6 @@ class Character extends FlxSprite
 			atlas.showPivot = false;
 			try
 				Paths.loadAnimateAtlas(atlas, json.image);
-			catch(e:haxe.Exception)
-				trace('Could not load atlas ${json.image}: $e');
 		}
 		#end
 
