@@ -140,10 +140,6 @@ class Character extends FlxSprite
 			loadCharacterFile(Json.parse(Assets.getText(path)));
 			#end
 		}
-		catch(e:Dynamic)
-		{
-			trace('Error loading character file of "$character": $e');
-		}
 
 		skipDance = false;
 		hasMissAnimations = hasAnimation('singLEFTmiss') || hasAnimation('singDOWNmiss') || hasAnimation('singUPmiss') || hasAnimation('singRIGHTmiss');
